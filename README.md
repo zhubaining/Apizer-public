@@ -14,7 +14,7 @@ Apizer 就是总结出的一个给AI干这个事情的skill文档。
 
 很简单：
 
-1. 把 [SKILL.md](./SKILL.md) 直接交给你自己的 Agent
+1. 把 [SKILL.md](./SKILL.md) 直接交给你自己的 Agent，告诉它参照skill分析出某某网站的xx操作的API。
 2. Agent 读取 skill 后，就会知道：
    - 推荐使用 `Playwright + Playwright MCP Bridge`
    - 先做分析与沉淀
