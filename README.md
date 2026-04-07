@@ -30,16 +30,7 @@ Apizer 就是总结出的一个给AI干这个事情的skill文档。
 
 - [SKILL.md](./SKILL.md)
 
-这是 Apizer 自己的主 skill。
-
-作用：
-
-- 告诉 Agent 应该如何接管真实页面
-- 如何分析接口
-- 如何沉淀成本地私有凭证和可分享 connector skill
-- 如何在后续阶段复用已经沉淀出来的能力
-
-如果你只想让自己的 Agent 用起来，优先把这个文件交给 Agent。
+这是 Apizer 自己的主 skill，前面说了。
 
 ### 2. 已经分析出来的示例skills
 
