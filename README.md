@@ -45,14 +45,19 @@ Apizer 用来把网站里的真实浏览器操作，沉淀成可复用的 Agent 
 
 - [skills](./skills)
 
-这个目录下放的是已经沉淀好的具体 connector skills。
+当前 `skills/` 目录里已经有这些可直接复用的接口示例：
 
-作用：
+- [connector-deepseek-open-platform-balance](./skills/connector-deepseek-open-platform-balance/SKILL.md)：读取 DeepSeek 开放平台账户余额、赠送余额、可用 token 估算、当月费用、当月 token 用量
+- [connector-jike-post-manage](./skills/connector-jike-post-manage/SKILL.md)：获取即刻帖子列表和互动数、读取单条帖子详情、发帖、删帖
+- [connector-jike-post-engagement-stats](./skills/connector-jike-post-engagement-stats/SKILL.md)：读取即刻帖子列表、正文、发布时间以及点赞、评论、转发、分享统计
+- [connector-wechat-web-message-manage](./skills/connector-wechat-web-message-manage/SKILL.md)：拉取 Web 微信通讯录、获取最新消息、发送文本消息
 
-- 每个子目录对应一个已经分析出来的站点动作
-- Agent 后续可以直接读取这些 skill 来执行具体动作
+这些示例的意义不是“只适用于这些网站”，而是给你一个可复用模板：
 
-它们相当于“分析完成后的产物”。
+- 如何描述 connector 的目标动作
+- 如何说明主接口和辅助接口
+- 如何组织动态字段和本地凭证
+- 如何给 Agent 提供后续可重复调用的执行规则
 
 ### 3. 移除实际值的 credential 文件
 
@@ -90,31 +95,6 @@ Apizer 用来把网站里的真实浏览器操作，沉淀成可复用的 Agent 
 
 - 有些场景下需要单独做 CDP 录制
 - 它可以作为 `Playwright MCP Bridge` 主线之外的补充工具
-
-## 已分享接口示例
-
-当前 `skills/` 目录里已经有这些可直接复用的接口示例：
-
-- [connector-deepseek-open-platform-balance](./skills/connector-deepseek-open-platform-balance/SKILL.md)：读取 DeepSeek 开放平台账户余额、赠送余额、可用 token 估算、当月费用、当月 token 用量
-- [connector-jike-post-manage](./skills/connector-jike-post-manage/SKILL.md)：获取即刻帖子列表和互动数、读取单条帖子详情、发帖、删帖
-- [connector-jike-post-engagement-stats](./skills/connector-jike-post-engagement-stats/SKILL.md)：读取即刻帖子列表、正文、发布时间以及点赞、评论、转发、分享统计
-- [connector-wechat-web-message-manage](./skills/connector-wechat-web-message-manage/SKILL.md)：拉取 Web 微信通讯录、获取最新消息、发送文本消息
-
-这些示例的意义不是“只适用于这些网站”，而是给你一个可复用模板：
-
-- 如何描述 connector 的目标动作
-- 如何说明主接口和辅助接口
-- 如何组织动态字段和本地凭证
-- 如何给 Agent 提供后续可重复调用的执行规则
-
-## 一句话理解
-
-如果你要把 Apizer 给别人用，最核心的是分享这几个东西：
-
-- [SKILL.md](./SKILL.md)
-- [skills](./skills)
-- 一个脱敏后的 [connector.credentials.json](./connector.credentials.json) 模板
-- [cdp_record_reliable.js](./scripts/cdp_record_reliable.js)
 
 ## 作者
 
