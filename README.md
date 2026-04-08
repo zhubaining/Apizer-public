@@ -56,7 +56,7 @@ Apizer 的默认目标不是一上来就沉淀页面操纵脚本，而是：
 - [http-jike-post-manage.js](./scripts/http-jike-post-manage.js)：获取即刻帖子列表和互动数、读取单条帖子详情、发帖、删帖
 - [http-jike-post-engagement-stats.js](./scripts/http-jike-post-engagement-stats.js)：读取即刻帖子列表、正文、发布时间以及点赞、评论、转发、分享统计
 - [http-wechat-web-message-manage.js](./scripts/http-wechat-web-message-manage.js)：拉取 Web 微信通讯录、获取最新消息、发送文本消息
-- [playwright-x-post-create.js](./scripts/playwright-x-post-create.js)：基于 `Playwright MCP + Bridge` 在真实已登录的 X 页面发帖，不依赖 `credentials.json`
+- [playwright-x-post-create.js](./scripts/playwright-x-post-create.js)：基于 `Playwright MCP + Bridge` 在真实已登录的 X 页面发帖，不依赖 `credentials.json`，支持直接命令行执行
 
 推荐写法是：
 
@@ -71,9 +71,16 @@ Apizer 的默认目标不是一上来就沉淀页面操纵脚本，而是：
 补充说明：
 
 - `HTTP` 脚本通常可以直接在本地 Node 环境执行
-- `Playwright` 脚本如果明确依赖 `Playwright MCP + Bridge`，则应理解为“给 Agent/runtime 复用的页面动作脚本”
-- 这种脚本的前提是：Agent 已经接管了真实浏览器页面；脚本本身不必再自行启动浏览器
+- `Playwright` 脚本如果明确依赖 `Playwright MCP + Bridge`，则应理解为“通过 MCP server 去驱动真实页面的动作脚本”
+- 脚本可以保留模块化页面动作函数，但最终应提供一个可直接执行的命令行入口
+- 这类脚本的推荐形态是：命令行里直接启动 `playwright-mcp --extension`，再通过 MCP 调用真实页面动作
 - 如果脚本只是操作已登录页面，而不需要 cookie/token/session，这类页面选择器和默认 URL 不应写入 `credentials.json`
+
+X 发帖脚本当前的直接执行方式：
+
+- 先安装依赖：`npm install`
+- 确保浏览器里的 `Playwright MCP Bridge` 已连接，且当前登录了 `x.com`
+- 执行：`node scripts/playwright-x-post-create.js create "你的帖子内容"`
 
 ### 3. 凭证模板与本地敏感文件
 

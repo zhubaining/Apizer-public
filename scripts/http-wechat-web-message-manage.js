@@ -32,6 +32,11 @@
  * - argv[2]: action，支持 contacts/sync/send
  * - send: argv[3] 为 content，argv[4] 可选 to_user_name
  *
+ * 命令行用法:
+ * - 通讯录: node scripts/http-wechat-web-message-manage.js contacts
+ * - 拉取增量消息: node scripts/http-wechat-web-message-manage.js sync
+ * - 发送消息: node scripts/http-wechat-web-message-manage.js send "消息内容" [to_user_name]
+ *
  * 成功判定:
  * - contacts: HTTP 200 且 MemberList 存在
  * - sync: synccheck retcode === 0；若有增量则 webwxsync Ret === 0

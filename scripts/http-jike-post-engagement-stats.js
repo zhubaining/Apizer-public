@@ -17,6 +17,10 @@
  * 输入参数:
  * - argv[2]: limit，可选，默认 20
  *
+ * 命令行用法:
+ * - 默认拉取 20 条: node scripts/http-jike-post-engagement-stats.js
+ * - 指定条数: node scripts/http-jike-post-engagement-stats.js 50
+ *
  * 成功判定:
  * - HTTP 200
  * - 响应中存在 data[0].id

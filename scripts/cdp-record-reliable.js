@@ -22,6 +22,13 @@
  * - `--reload`: 连接成功后自动刷新页面再开始录制
  * - `--no-bodies`: 不抓 response body，只记录请求/响应元信息
  *
+ * 命令行用法:
+ * - 默认录制第一个 http 页面: node scripts/cdp-record-reliable.js
+ * - 按 URL / title 片段录制: node scripts/cdp-record-reliable.js x.com
+ * - 指定输出目录: node scripts/cdp-record-reliable.js x.com ./raw/x
+ * - 连接后自动刷新: node scripts/cdp-record-reliable.js x.com ./raw/x --reload
+ * - 只录请求元信息: node scripts/cdp-record-reliable.js x.com ./raw/x --no-bodies
+ *
  * 输出：
  * - `cdp-network-events.jsonl`: 原始 `Network.*` 事件流
  * - `cdp-network-requests.jsonl`: 按 requestId 聚合后的请求/响应记录

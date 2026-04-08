@@ -18,6 +18,9 @@
  * 输入参数:
  * - 无
  *
+ * 命令行用法:
+ * - 直接读取余额概览: node scripts/http-deepseek-open-platform-balance.js
+ *
  * 成功判定:
  * - HTTP 200
  * - 响应中存在 data.biz_data.normal_wallets[0].balance

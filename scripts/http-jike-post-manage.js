@@ -26,6 +26,13 @@
  * - create: argv[3] 为 content，argv[4] 可选 topic_id
  * - delete: argv[3] 为 post_id
  *
+ * 命令行用法:
+ * - 列表: node scripts/http-jike-post-manage.js list
+ * - 指定条数列表: node scripts/http-jike-post-manage.js list 50
+ * - 详情: node scripts/http-jike-post-manage.js detail <post_id>
+ * - 发帖: node scripts/http-jike-post-manage.js create "帖子内容" [topic_id]
+ * - 删帖: node scripts/http-jike-post-manage.js delete <post_id>
+ *
  * 成功判定:
  * - list/detail: HTTP 200 且响应里有 data
  * - create/delete: HTTP 200 且 success === true

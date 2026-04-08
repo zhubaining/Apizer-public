@@ -507,7 +507,9 @@ credentials.json
 - 浏览器在第一类场景中主要用于前期录制、分析和后续凭证更新
 - 浏览器在第二类场景中本身就是最终执行载体
 - 这里说的 `Playwright` 最终产物，默认特指 `Playwright MCP + Playwright MCP Bridge` 页面脚本：
-  - 运行在 Agent 已接管真实页面的上下文里
+  - 默认应提供可直接命令行执行的入口
+  - 命令行执行时，脚本自己负责启动或连接 `playwright-mcp --extension`
+  - 再通过 MCP server 调真实浏览器页面动作
   - 不是默认去产出一个脱离 Bridge 独立运行的 CDP 脚本
   - CDP / `connectOverCDP` / `remote-debugging-port` 这类方案只算补充方法，不算默认主线产物
 
@@ -636,7 +638,9 @@ artifacts/
 - 产物是 `scripts/playwright-<connector-id>.js`
 - 最终仍需在真实浏览器页面上下文里执行
 - 默认指 `Playwright MCP + Playwright MCP Bridge` 页面脚本
-- 运行前提是 Agent 已接管真实页面，而不是重新走一套独立 CDP 启动流程
+- 默认应提供可直接运行的 CLI 入口，而不是只暴露一个等待外部传 `page` 的函数
+- 推荐做法是：脚本自己连接 `playwright-mcp --extension`，再通过 MCP 去驱动真实页面
+- 不是重新走一套独立 CDP 启动流程
 - 适用于关键动作依赖页面运行时、动态签名、设备证明或其他无法稳定抽离成纯 HTTP 重放的场景
 
 补充说明：
