@@ -1,6 +1,6 @@
 ---
 name: Apizer
-description: Use when the user wants to turn a website's browser workflow into reusable Agent assets by using Playwright plus Playwright MCP Bridge to operate the real browser, analyze network and page behavior, separate private session material from a shareable connector skill entry, and keep local credentials up to date when tokens expire.
+description: Use when the user wants to turn a website's browser workflow into reusable Agent assets by using Playwright plus Playwright MCP Bridge to operate the real browser, analyze network and page behavior, generate reusable execution scripts, and keep local credentials up to date when tokens expire.
 ---
 
 # Apizer
@@ -13,36 +13,21 @@ description: Use when the user wants to turn a website's browser workflow into r
 
 - 直接接管用户当前真实浏览器页面并执行操作
 - 顺手读取前后端交互数据和页面代码
-- 把页面背后的 API、动态字段和私有凭证来源沉淀成可复用 skill
+- 把页面背后的 API、动态字段和私有凭证来源沉淀成可复用脚本
+- 即使最后分析不出可稳定重放的 API，或目标站点存在较强反自动化机制，也仍然可以沉淀出 `Playwright` 页面脚本，后续通过操作页面的方式完成自动化
 
-整个 Skill 应分成四个部分来理解：
+完整主流程见下方 [核心主线](#核心主线)。
 
-1. 准备
-- 安装 `Playwright MCP`
-- 安装 `Playwright MCP Bridge`
-- 确认扩展连接成功，可真正接管当前浏览器 tab
+阅读方式：
 
-2. 录制与沉淀
-- 接管真实页面
-- 录制或读取交互数据
-- 识别主接口、依赖接口、动态字段、私有凭证来源
-- 产出可分享的 connector skill 定义和本地私有凭证材料
+1. 先看“步骤目录”，明确总流程
+2. 再按“逐步展开”逐条执行
 
-3. 后续调用
-- 读取已经沉淀好的 `SKILL.md`
-- 读取本地 `connector.credentials.json`
-- 直接调用接口，或在需要时回到浏览器上下文补齐动态值
+补充要求先记住三条：
 
-4. `credentials` 更新
-- 当 cookie、token、csrf 等值失效时
-- 重新通过 `Playwright MCP Bridge` 接管真实页面
-- 在真实登录态下重新抓取最新私有凭证
-- 更新回本地 `connector.credentials.json`
-
-也就是说：
-
-- 前两部分解决“怎么把页面动作变成可复用能力”
-- 后两部分解决“之后怎么稳定重复调用并持续维护这项能力”
+- 默认先由 Agent 自己操作页面，只有遇到登录、验证码、权限确认或其他必须人工完成的环节时，才请求用户协助
+- 默认不能跳过落盘，不能只在对话里描述接口，不生成文件
+- 最小真实测试必须先征得用户确认，不能直接执行
 
 用于把“用户在浏览器里做一遍操作”转换成两类可复用资产：
 
@@ -53,21 +38,19 @@ description: Use when the user wants to turn a website's browser workflow into r
 - 动态 header 实值
 - 其他会话态、设备态、运行时值
 
-2. 可分享执行型 Skill
-- host / method / path
-- 请求参数 schema
-- 响应字段 schema
-- 动作语义
-- 动态字段来源
+2. 可执行脚本
+- `connector id`
+- 作用说明
+- 主接口
+- 输入参数
+- 所需 credentials 字段
 - 成功判定
-- 前置依赖
-- 最小 `curl` 模板
-- 必要的分析结论摘要
+- 最小真实请求逻辑
 
 本 Skill 适用于：
 - 用户想分析某个网站的非公开 API
 - 用户愿意配合登录并手动做一遍目标操作
-- 需要把分析结果沉淀为可复用的 Agent Skill / Connector
+- 需要把分析结果沉淀为可复用的脚本与凭证结构
 - 当前目标是带 Web 界面的系统，且主要基于浏览器中的网络交互完成动作
 
 本 Skill 不适用于：
@@ -79,35 +62,70 @@ description: Use when the user wants to turn a website's browser workflow into r
 
 ## 核心主线
 
-下面这套流程是当前默认主线，优先围绕：
+下面这套结构分两层看：
 
-- `Playwright + Playwright MCP Bridge`
+1. 先看“步骤目录”，明确总流程
+2. 再看“逐步展开”，按同样编号查每一步该怎么做
 
-展开。
+执行时必须遵守这 5 条纪律：
 
-### 开始前的准备工作
+1. 必须严格按步骤顺序推进，不要跳步
+2. 一个步骤完成后，立刻进入下一步，不要停留在“继续整理”“稍后再落盘”这类中间态
+3. 只要已经足够得出当前步骤结论，就必须收口，不要无限补材料
+4. 除非遇到明确阻塞，否则不要回退到前一步重做整套流程
+5. 只有两种情况可以停下来问用户：
+   - 当前步骤确实需要用户协助，例如登录、验证码、权限确认、测试授权
+   - 当前步骤存在多个风险明显不同的分支，必须由用户选
 
-在进入分析阶段之前，必须先把 `Playwright MCP` 和 `Playwright MCP Bridge` 扩展准备好，并确认扩展连接成功。
+### 步骤目录
 
-至少要满足这三个前提：
+1. 准备安装：安装 `Playwright MCP`
+2. 扩展连接：安装 `Playwright MCP Bridge` 并确认连接成功
+3. 目标确认：明确网站、目标接口、具体操作
+4. 页面接管：接管当前真实页面
+5. 页面操作：默认先由 Agent 操作，必要时再请用户协助
+6. 数据抓取：抓取交互数据和必要的页面运行时信息
+7. 接口分析：识别主接口、依赖接口、动态字段、私有凭证来源
+8. 接口落盘：生成脚本和 `credentials.json`
+9. 脚本测试：选一个无害接口做最小真实测试
+10. 后续复用：直接用脚本和 `credentials.json` 复用
+11. 模式判断：判断最终产物是 `HTTP` 还是 `Playwright`
+12. 凭证更新：token 过期后回到真实页面更新 `credentials.json`
 
-1. 已安装 `Playwright MCP`
-2. 已安装 `Playwright MCP Bridge` 浏览器扩展
-3. 当前扩展已经成功连接，可真正接管浏览器 tab
+### 逐步展开
 
-如果这一步没完成，后面的“接管真实页面、自动化操作、读取网络请求、分析页面代码”都无法稳定进行。
-
-#### 1. 安装 `Playwright MCP`
+### 1. 准备安装：安装 `Playwright MCP`
 
 确保本地已经有可用的 `Playwright MCP` 服务端，并能被当前 Agent 正常调用。
 
-#### 2. 安装 `Playwright MCP Bridge` 扩展
+`Playwright MCP` 的本地运行状态目录必须指向用户级可写目录：
+
+- 默认推荐使用：`~/.playwright-mcp`
+- 不要使用根目录下的 `/.playwright-mcp`
+- 不要把该目录放在当前项目仓库内
+
+如果出现以下报错，优先排查状态目录配置，而不是继续抓包：
+
+- `ENOENT`
+- `mkdir '/.playwright-mcp'`
+- 只读文件系统
+
+默认排查顺序：
+
+1. 检查启动 `Playwright MCP` 的进程里 `HOME` 是否正确
+2. 检查它是否把状态目录错误解析到了 `/`
+3. 如有需要，显式指定状态目录到 `~/.playwright-mcp`
+
+结论：
+
+- 遇到这类问题时，先修复本地状态目录配置，再继续后续分析
+- 不要尝试手动创建 `/.playwright-mcp`
+
+### 2. 扩展连接：安装 Bridge 并确认连接成功
 
 在你实际使用的浏览器里安装 `Playwright MCP Bridge` 扩展。
 
 只有安装了这个扩展，Agent 才能去接管你当前真实浏览器里的 tab，而不是只会新起一个隔离浏览器。
-
-#### 3. 确认扩展连接成功
 
 安装完成后，不要直接默认它已经可用，必须再确认一次：
 
@@ -122,24 +140,37 @@ description: Use when the user wants to turn a website's browser workflow into r
 - Agent 侧浏览器工具直接报错
 - 页面虽然开着，但无法真正读取、点击、抓请求
 
-结论：
+### 3. 目标确认：明确网站、接口和操作
 
-- 在这份 Skill 里，“安装好 Playwright MCP + Bridge 扩展，并确认连接成功”属于正式准备步骤，不是可省略细节
+开始之前，不能只知道“想抓接口”，必须先让用户明确这三件事：
 
-## 录制与沉淀
+1. 是哪个网站
+2. 想抓的到底是哪类接口
+3. 这次具体要录哪几个操作
 
-### 1. 明确单一动作
+推荐先让用户按这个格式说清楚：
 
-先让用户明确这次要分析的动作，例如：
+- 网站：例如 DeepSeek、即刻、Web 微信、某 SaaS 后台
+- 目标接口：例如余额、发帖、拉消息、删记录、查详情
+- 具体操作：例如“打开余额页”“发一条帖子”“删除一条帖子”“发送一条消息”
 
-- “发一个帖子”
-- “下载账单”
-- “发送一条消息”
-- “创建一个任务”
+如果用户描述仍然过大，先继续收缩，不要直接开始录制。
 
-如果用户描述过大，先收缩成单一动作。
+例如：
 
-### 2. 接管用户当前真实页面
+- 不够具体：“我想抓即刻的接口”
+- 更合格：“我想抓即刻 Web 端发帖接口和删帖接口”
+- 更合格：“这次先录两个操作：发一条原帖、删除一条原帖”
+
+本步完成标志：
+
+- 已明确网站
+- 已明确目标接口或目标结果
+- 已明确这次要录的具体操作
+
+如果这三项里有任意一项还是模糊的，不要进入下一步。
+
+### 4. 页面接管：接管当前真实页面
 
 默认不要先新起一个隔离浏览器去重走流程，而是优先：
 
@@ -150,26 +181,26 @@ description: Use when the user wants to turn a website's browser workflow into r
 1. 直接复用真实浏览器里的登录态
 2. 在操作页面时顺手读取网络请求和页面代码
 
-### 3. 引导用户完成一次真实操作录制
+### 5. 页面操作：默认先由 Agent 操作
 
-这一步必须主动提示用户配合。
+默认先由 Agent 在已接管的真实页面上完成一次目标操作。
 
-应明确告诉用户去做：
+只有遇到这些情况时，才请求用户协助：
 
-- 登录目标网站
-- 完成目标操作
-- 操作完成后回复“好了”
+- 需要登录
+- 出现验证码
+- 需要权限确认
+- 需要人工判断或人工点击的特殊环节
 
-推荐提示格式：
+如果动作有副作用，例如发帖、删帖、发消息、提交表单，要先明确这是一次真实线上操作。
 
-- “请在当前已接管的浏览器页面中完成一次 `<目标动作>`，做完后回复‘好了’。”
+协作原则：
 
-补充要求：
+- 默认优先由 Agent 自己把目标操作完整做一遍，这样最利于连续抓取和分析
+- 如果某一步确实必须由用户亲自操作，例如扫码登录、验证码、二次确认、人工选择目标项，则要明确提示用户来操作，而 Agent 继续负责录制和分析
+- 不要因为可以让用户帮忙点，就默认把整段流程都交给用户；只有必须人工完成的环节才切给用户
 
-- 如果用户做的是有副作用的动作，例如“发帖”或“删帖”，要明确这是一次真实线上操作
-- 如果动作会产生产出物，后续要考虑是否需要清理测试数据
-
-### 4. 同时获取两类分析材料
+### 6. 数据抓取：先抓真实交互数据
 
 在 `Playwright MCP Bridge` 主线下，优先同时拿两类材料：
 
@@ -186,13 +217,132 @@ description: Use when the user wants to turn a website's browser workflow into r
 - 初始化状态
 - hydration 数据
 
-也就是说，这条主线不是只做页面点击，而是：
+这两类材料的权重不要平均分配，默认优先级固定为：
 
-- 一边自动化页面
-- 一边抓网络
-- 一边看前端代码
+- 网络交互数据：`80%`
+- DOM：`15%`
+- 前端 JS：`5%`
 
-### 5. 分析并识别主接口
+这里的意思是：
+
+- 主线永远是网络交互数据
+- DOM 主要用来对照页面上到底显示了什么
+- 前端 JS 主要用来补动态参数、签名和运行时拼装逻辑
+
+不要反过来做，尤其不要一上来就：
+
+- 先扫前端 JS 猜接口
+- 先从 DOM 反推接口
+
+这样很容易把候选接口、废弃逻辑或辅助接口误判成主接口。
+
+具体抓取时，默认按下面顺序做：
+
+1. 先清空已有噪声
+- 如果网络面板里已经堆了很多旧请求，先清空
+- 保证后面看到的请求主要对应这一次目标操作
+
+2. 再执行目标操作
+- 由 Agent 自己在已接管页面上执行目标动作
+- 如果卡在登录、验证码、权限确认，再请用户协助
+
+3. 先拿请求列表
+- 优先拿到这次操作前后时间窗口内的请求清单
+- 至少要记录：
+  - URL
+  - method
+  - status
+  - request headers
+  - request body
+  - response headers
+
+4. 再补拿 response body
+- 不要假设“请求列表”天然就带完整 response body
+- response body 默认要单独确认是否真的拿到了
+
+拿 response body 时，默认按这个优先级：
+
+1. 先看当前网络工具是否已经直接返回 body
+- 如果当前工具返回的请求详情里已经有 response body，直接保存
+- 优先保存 JSON 原文，不要先手工改写
+
+2. 如果网络列表没有 body，就在浏览器上下文里补抓
+- 这不是可选示例，而是拿 `response body` 的标准补充方法
+- 最稳的方式就是监听真实响应，再读取 body
+- 核心做法是：
+  - 在页面里继续触发一次同样动作
+  - 对候选请求监听响应
+  - 在响应到达时读取 `response.text()` / `response.body()`
+
+最小示意：
+
+```js
+page.on("response", async (response) => {
+  const url = response.url();
+  if (!url.includes("/api/target")) return;
+
+  const contentType = response.headers()["content-type"] || "";
+  if (contentType.includes("application/json") || contentType.includes("text")) {
+    const text = await response.text();
+    console.log(text);
+  } else {
+    const body = await response.body();
+    console.log(body);
+  }
+});
+```
+
+使用这条方法时要注意：
+
+- 先注册监听，再触发目标动作
+- 只过滤候选接口，不要把所有响应都打印出来
+- 如果响应可能包含敏感信息，抓到后要用于分析，不要原样写进公开文件
+
+3. 如果还是拿不到，就在当前登录态里重放候选接口
+- 用已经抓到的 URL、method、headers、body
+- 在当前真实登录态下再发一次最小真实请求
+- 再读取返回的 JSON / text
+
+4. 如果响应是流式、压缩、二进制或工具限制明显
+- 直接切换到 CDP / HAR / `chrome://net-export/` 作为补充材料
+- 不要在“body 根本没拿到”的情况下硬猜字段
+
+判断“这次算不算抓到了 response body”，标准很简单：
+
+- 不是只看到 status `200`
+- 不是只看到 `content-type: application/json`
+- 而是手里真的有可读的响应内容
+
+至少要满足其一：
+
+- 拿到了完整 JSON
+- 拿到了可读 text
+- 拿到了可供后续解析的原始 body
+
+如果没拿到 body，默认不要进入下一步主接口判定。
+
+执行顺序要特别注意：
+
+- 默认应优先耐心完成真实交互数据的抓取
+- 只有当这条主线已经拿到了足够材料，或明确拿不到关键数据时，才把前端 JS 分析作为补充手段
+
+禁止一上来就因为图省事，过早跳到“扫 JS / 猜接口”的路线。
+
+原因是：
+
+- 真实交互数据里的请求、响应、header、body 才是第一手证据
+- 单看前端 JS 很容易只看到候选接口、辅助接口或废弃逻辑
+- 很多关键动态字段是否真的参与请求，必须靠真实录制确认，不能只靠代码猜
+
+本步完成标志：
+
+- 已拿到本次动作对应的候选请求列表
+- 已至少拿到一个候选主接口的可读 response body，或已确认为什么当前拿不到
+- 已明确是否需要切到 HAR / CDP / `chrome://net-export/` 作为补充
+
+如果还没有可读 response body，默认不要进入下一步。
+
+### 7. 接口分析：识别主接口和动态字段
 
 先做规则化筛选，再考虑调用模型。
 
@@ -209,11 +359,7 @@ description: Use when the user wants to turn a website's browser workflow into r
 - 依赖接口
 - 轮询/埋点/噪声请求
 
-#### 5.1 判定“主接口”的方法
-
-不要只因为某个 URL 名字“看起来像”目标动作，就直接把它认定为主接口。
-
-必须按下面顺序判断：
+判定“主接口”时必须按下面顺序判断：
 
 1. 先缩小候选集
 - 只看目标动作发生时间窗口内的业务请求
@@ -233,9 +379,7 @@ description: Use when the user wants to turn a website's browser workflow into r
 - 比较哪个响应真正包含目标结果
 - 用真实结果确认主接口，而不是靠猜测
 
-### 6. 拆分动态字段与私有凭证
-
-把接口里的动态值归类到下列来源：
+同时把接口里的动态值归类到下列来源：
 
 1. `cookie`
 2. `header token`
@@ -244,278 +388,137 @@ description: Use when the user wants to turn a website's browser workflow into r
 5. `upstream dependency API`
 6. `user input`
 
-输出时必须分别标注。
+DOM 在这一步只承担三类职责：
 
-### 7. 生成沉淀产物
+1. 确认页面确实显示了哪个值
+2. 确认某段文案对应哪个统计项
+3. 在多个候选字段之间做最后对照
 
-必须生成两类产物：
+前端 JS 在这一步只作为补充工具，适合用于解释：
 
-#### A. 私有材料
+- 动态签名怎么生成
+- 请求参数如何在运行时拼装
+- 分页、排序、灰度或懒加载逻辑
+- 为什么页面会触发某些请求
 
-统一写入：
+只有在这些场景里才值得调用模型：
 
-- `connector.credentials.json`
+- 从大量请求中识别哪个请求才是目标动作
+- 推断依赖链
+- 推断动态字段语义
+- 生成脱敏后的接口说明
+- 生成可执行脚本模板
 
-里面保存：
+如果主接口已经明显可见，不要为了“看起来更智能”而强行调用模型。
 
-- cookie
-- token
-- csrf
-- session
-- 动态 header 实值
-- 其他仅本地可用的私有会话材料
+这一阶段的分析结论至少要覆盖：
 
-#### B. 可分享执行型 Skill
-
-统一写入：
-
-- `skills/connector-<site>-<action>/SKILL.md`
-
-里面至少要写清：
-
+- 目标动作名称
 - 主接口
-- 辅助接口
-- 动态字段来源
-- 最小 `curl` 模板
-- 成功判定
-- 结果映射
+- 前置依赖接口
+- 动态字段列表
+- 私有材料清单
+- 是否可直接 HTTP 重放
+- 若不可直接重放，所需执行上下文
 
-要求：
+最终目标不是导出“所有请求”，而是识别：
 
-- Skill 里不能出现真实 cookie、token、session 值
-- 只能使用占位符
-
-### 8. 做一次最小真实测试
-
-分析完成后，不要直接宣布可用。
-
-必须先做一次最小真实动作测试，例如：
-
-- 发送一条测试消息
-- 发一条测试帖子
-- 创建一条测试记录
-- 拉一份测试数据
-
-测试前要明确告诉用户：
-
-- 将执行什么动作
-- 是否会产生真实线上数据
-- 是否需要后续清理
-
-如果测试失败：
-
-- 不要安装
-- 必须明确说明失败原因：
-  - 鉴权缺失
-  - 动态 token 未补齐
-  - 依赖接口缺失
-  - 页面上下文要求未满足
-  - 目标动作有额外风控
-
-## 后续调用
-
-当前面已经沉淀出：
-
-- `connector.credentials.json`
-- `skills/connector-<site>-<action>/SKILL.md`
-
-后续调用阶段的目标就是：
-
-- 不再重新分析
-- 直接复用已经沉淀好的能力
-
-### 1. 读取 skill 与本地凭证
-
-后续调用时，优先：
-
-1. 读取 `skills/connector-<site>-<action>/SKILL.md`
-2. 读取本地 `connector.credentials.json`
-
-### 2. 判断执行模式
-
-对每个 connector，必须给出执行模式判断：
-
-1. `direct_http`
-- 只需本地私有凭据即可执行
-
-2. `browser_context`
-- 必须在浏览器页面上下文内取动态值
-
-3. `hybrid`
-- 浏览器里取动态值，本地再发请求
-
-4. `unsupported`
-- 当前无法稳定自动化
-
-### 3. 直接调用，必要时回到浏览器补值
-
-后续调用的默认策略：
-
-- 能直接 HTTP 调用，就不要重新做整套分析
-- 如果某些动态值失效，再回到 `Playwright MCP Bridge` 页面上下文里补齐
-
-## Credentials 更新
-
-这是这份 Skill 里必须单独维护的一节，不能只在“调用失败”时顺手提一句。
-
-原因是：
-
-1. 很多 connector 的真实执行能力，本质上依赖本地 `connector.credentials.json`
-2. 里面保存的 cookie、authorization、csrf、session、动态 header 都是有时效性的
-3. 如果不定义更新流程，skill 第一次能用，后面很容易因为凭证过期而失效
-
-### 1. 什么情况下要更新
-
-出现以下任一信号，就应该优先怀疑本地凭证已经过期：
-
-- 接口返回“未登录”“未授权”“token expired”“session invalid”
-- 原来可用的 `curl` 模板突然全部返回 `401`、`403` 或登录页
-- 同一个 skill 之前可用，现在在没有改接口的情况下失效
-- 页面里仍然能正常操作，但本地 direct HTTP 调用失败
-
-### 2. 更新的默认方法
-
-默认不要手工猜测 token 来源，也不要让用户自己去 DevTools 里一个个复制。
-
-优先使用：
-
-- `Playwright + Playwright MCP Bridge`
-
-让 Agent 重新接管用户当前真实浏览器页面，然后在真实登录态下重新获取：
-
-- cookie
-- authorization / access token
-- csrf token
-- 动态 header
-- 其他 runtime 值
-
-### 3. 推荐更新步骤
-
-1. 让用户先在真实浏览器里重新登录目标站点
-2. 使用 `Playwright MCP Bridge` 接管当前已登录 tab
-3. 重新执行一次最小必要动作
-4. 同时重新读取网络请求和页面运行时里的最新私有值
-5. 只更新对应 connector 所需的字段，不要误覆盖其它 connector
-6. 写回本地 `connector.credentials.json`
-7. 立即用最小真实请求再验证一次
-
-### 4. 更新时的输出要求
-
-更新 `credentials` 时，不要只说“已重新登录”。
-
-必须明确写清：
-
-- 哪个 connector 的凭证已更新
-- 更新了哪些字段
-- 这些字段来自哪里
-- 更新后是否已做最小验证
-
-### 5. 对 Agent 的要求
-
-当发现 token 失效时，Agent 的默认动作应该是：
-
-1. 先识别这是凭证过期，不要立刻误判为接口逻辑变了
-2. 回到 `Playwright MCP Bridge` 主线，重新从真实页面获取最新凭证
-3. 更新本地 `connector.credentials.json`
-4. 再执行一次最小真实验证
-5. 只有在重新获取凭证后仍失败，才继续怀疑接口结构、动态参数或风控机制发生变化
-
-## 核心原则
-
-### 零、当前能力边界
-
-当前这份 Skill 只适合：
-- 为 Web 界面的系统做自动 API 分析
-- 基于浏览器中的真实交互数据生成可复用 Skill
-
-当前不应承诺支持：
-- Native App
-- 桌面原生客户端
-- 强依赖设备安全能力的系统
-
-此外，如果目标 Web 系统存在明显防自动化机制，则本 Skill 可能失效或只能部分生效。
-
-典型场景包括：
-- 动态 transaction id
-- request signature
-- anti-bot token
-- challenge / 风控校验
-- 页面上下文强绑定
-
-例如：
-- 类似 `X / Twitter` 这类存在动态事务/签名机制的站点，就可能导致“分析出接口但无法稳定自动执行”
-
-### 一、输出必须拆成两层
-
-永远不要把分析结果混成一份文件。
-
-必须拆成：
-
-1. `private credentials file`
-- 仅本地使用
-- 不分享
-- 默认应被 `.gitignore`
-
-2. `shareable connector SKILL.md`
-- 可分享
-- 必须脱敏
-- 所有敏感值改为占位符
-
-默认不要为每个动作再拆出多份分析文件、测试文件、执行脚本。
-
-优先维护两份长期文件：
-
-1. `connector.credentials.json`
-- 存所有站点/动作的私有会话材料
-- 后续新分析结果直接按 `connector_id` 追加
-
-2. `connector-<site>-<action>/SKILL.md`
-- 存单个站点/动作的可分享执行型 Skill
-- 里面同时包含：
-  - 怎么用
-  - 主接口
-  - 辅助接口
-  - 动态字段来源
-  - `curl` 模板
-  - 成功判定
-  - 结果映射
-
-硬性约束：
-
-- 不要在单个 skill 目录下新增独立的 `credential.json`、`credentials.json` 或其他私有凭证文件
-- 私有材料只能统一写入项目根目录的 `connector.credentials.json`
-- `skills/connector-<site>-<action>/` 目录下默认只放 `SKILL.md`
-
-### 二、优先基于真实流量，不只靠代码猜
-
-分析顺序优先为：
-1. 真实浏览器录制
-2. CDP 导出的 request / response / network event 分析
-3. 页面上下文值来源分析
-4. 前端代码静态分析补充
-
-不要反过来。
-
-### 三、动作级抽象，不是接口列表堆积
-
-目标不是导出“所有请求”，而是识别：
 - 哪个请求才是真正执行动作的主接口
 - 哪些请求是它的前置依赖
 - 哪些字段是动态字段
 - 哪些字段来自私有会话材料
 
-## 什么时候调用大模型
+这一步最容易出现的错误，就是停在“还在整理”“还在收敛”。
 
-只有在这些阶段值得调用模型：
-- 从大量请求中识别“哪个请求才是目标动作”
-- 推断依赖链
-- 推断动态字段语义
-- 生成脱敏后的 connector spec
-- 生成执行型 skill 模板
+默认收口规则：
 
-如果主接口已经明显可见，不要为了“看起来更智能”而调用模型。
+- 如果已经能明确最终获取方式，就必须立即结束分析，进入落盘
+- 不要因为还能继续补充一些背景说明，就推迟落盘
+- 如果最终结论是“直接走公开 HTTP API 更稳”，也必须立刻按这个结论落盘，不要继续犹豫“是否还要更贴页面”
 
-## 推荐产物结构
+本步完成标志：
+
+- 已明确主接口或最终可复用获取方式
+- 已明确是 `HTTP` 还是 `Playwright`
+- 已列出本次脚本所需的 credentials 字段
+
+满足这三条后，必须立即进入第 8 步。
+
+### 8. 接口落盘：生成脚本和 `credentials.json`
+
+必须生成两类产物：
+
+1. 私有材料
+- 用户本地真实私有材料统一写入 `credentials.json`
+- 如果仓库需要公开分享，则仓库里只提交占位符模板 `credentials-example.json`
+- `credentials.json` 里面保存 cookie、token、csrf、session、动态 header 实值，以及其他仅本地可用的私有会话材料
+
+2. 可执行脚本
+- 统一写入 `scripts/<connector-id>.js`
+
+默认产物结构就是：
+
+```text
+credentials-example.json
+scripts/
+  http-<connector-id>.js
+  playwright-<connector-id>.js
+```
+
+本地真实运行时还应有一份不入库的：
+
+```text
+credentials.json
+```
+
+脚本命名约定：
+
+- HTTP API 类脚本统一命名为：`scripts/http-<connector-id>.js`
+- 页面操纵类脚本统一命名为：`scripts/playwright-<connector-id>.js`
+- 不再额外拆分子目录，统一放在 `scripts/` 下
+
+脚本文件开头的注释里至少要写清：
+
+- `connector id`
+- 作用
+- 主接口
+- 需要哪些 credentials 字段
+- 输入参数
+- 成功判定
+- 是否会产生真实线上副作用
+
+要求：
+
+- 脚本本身负责执行或验证入口
+- `HTTP` 脚本必须读取 `credentials.json`
+- `Playwright MCP + Bridge` 页面脚本只有在确实依赖额外私有材料时才读取 `credentials.json`
+- 脚本里不能硬编码真实 cookie、token、csrf、session
+- 与某个接口相关的说明优先写在脚本头注释里，不再要求每个接口单独维护子 `SKILL.md`
+- 不要在单个脚本旁边新增独立的 `credential.json`、`credentials.json` 或其他私有凭证文件
+- 私有材料只能统一写入项目根目录的 `credentials.json`
+- Public 仓库中默认不要提交真实 `credentials.json`
+- 如果需要公开分享示例，提交占位符版 `credentials-example.json`
+
+新增强制要求：
+
+- 最终产出分两种情况：
+  - 如果网站没有明显反自动化机制，且请求可稳定重放，则产出 `HTTP` 脚本
+  - 只有在多次尝试后仍无法稳定沉淀为 HTTP 接口，例如已经反复补抓 body、补齐动态字段、重放候选接口，仍被反自动化机制、动态 transaction id、动态签名、一次性 challenge、设备证明或页面运行时强绑定阻塞时，才产出 `Playwright` 页面操纵脚本
+- 浏览器在第一类场景中主要用于前期录制、分析和后续凭证更新
+- 浏览器在第二类场景中本身就是最终执行载体
+- 这里说的 `Playwright` 最终产物，默认特指 `Playwright MCP + Playwright MCP Bridge` 页面脚本：
+  - 运行在 Agent 已接管真实页面的上下文里
+  - 不是默认去产出一个脱离 Bridge 独立运行的 CDP 脚本
+  - CDP / `connectOverCDP` / `remote-debugging-port` 这类方案只算补充方法，不算默认主线产物
+
+默认偏好必须是：
+
+- 先尽量产出 `HTTP` 脚本
+- 只有在多次尝试后确认做不到时，才退到 `Playwright` 脚本
+
+默认不能跳过落盘，不允许只在对话里描述接口，不生成文件。
+
+如果需要保留原始材料，优先作为本地临时分析材料单独保存，不要混进公开脚本里，例如：
 
 ```text
 artifacts/
@@ -523,79 +526,173 @@ artifacts/
     cdp-network-log.json
     cookies.json
     local-storage.json
-  derived/
-    connector.credentials.json
-  skills/
-    connector-<site>-<action>/
-      SKILL.md
 ```
 
-## 分析报告要求
+本步完成标志：
 
-分析结论至少包含：
-- 目标动作名称
-- 主接口
-- 前置依赖接口
-- 动态字段列表
-- 私有材料清单
-- 可分享接口清单
-- 是否可直接 HTTP 重放
-- 若不可直接重放，所需执行上下文
+- `credentials.json` 已写好
+- `scripts/` 下的目标脚本已生成
+- 脚本头注释已写清用途、主接口、所需凭证、输入参数和成功判定
 
-## 执行策略分层
+如果文件还没落盘，只能算“未完成”，不能宣布分析完成。
 
-对每个 connector，必须给出执行模式判断：
+### 9. 脚本测试：先选无害接口验证
 
-1. `direct_http`
+分析完成后，不要直接宣布可用。
+
+默认应优先选择一个无害接口，先做一次最小真实测试，例如：
+
+- 拉一份测试数据
+- 读取一个详情对象
+- 获取一个只读列表
+
+如果当前目标是判断网站是否存在明显反自动化机制，优先先选一个浏览或读取类接口做 HTTP 重放测试。
+
+判断规则补充为：
+
+- 如果连浏览接口、只读列表、详情接口这类低风险 HTTP 请求都无法稳定重放，就应优先判断这条 `HTTP` 路径整体不成立
+- 这时不要继续在同一轮里执着于发帖、删帖、发消息这类更强副作用接口
+- 应尽快收口结论，转向 `Playwright MCP + Bridge` 页面脚本方案
+
+只有在没有合适只读接口时，才考虑带副作用动作，而且必须先再次明确提醒用户。
+
+测试前要明确告诉用户：
+
+- 将执行什么动作
+- 是否会产生真实线上数据
+- 是否需要后续清理
+- 必须先征得用户确认
+
+默认要求：
+
+- 先落盘
+- 再主动用刚刚落盘的 script / credentials 做一次最小真实测试
+- 把测试结果明确反馈给用户
+- 先问用户是否同意执行这个无害测试，再发请求
+
+如果测试失败：
+
+- 不要继续视为可复用产物
+- 必须明确说明失败原因：
+  - 鉴权缺失
+  - 动态 token 未补齐
+  - 依赖接口缺失
+  - 页面上下文要求未满足
+  - 目标动作有额外风控
+- 如果当前目标是 `HTTP` 脚本，且失败原因属于 `credentials` 缺失或过期，则必须继续完成下面这条闭环：
+  - 打开目标站点真实页面
+  - 从当前已登录页面重新获取并更新本地 `credentials.json`
+  - 再次运行刚刚落盘的 `HTTP` 脚本做真实验证
+  - 只有脚本重跑成功，才算这条 `HTTP` 能力真正沉淀完成
+- 不允许用一次临时 `curl` 成功来替代脚本验证
+- 也不允许停在“接口已经确认可用，但脚本稍后再修”这种状态
+
+本步完成标志：
+
+- 已向用户明确说明测试动作和风险
+- 已拿到用户确认
+- 已执行最小真实测试，或因用户未确认而明确停在这里等待
+
+### 10. 后续复用：直接用脚本和凭证运行
+
+当前面已经沉淀出：
+
+- `credentials.json`
+- `scripts/<connector-id>.js`
+
+后续调用阶段的目标就是：
+
+- 不再重新分析
+- 直接复用已经沉淀好的能力
+
+默认策略：
+
+- 能直接 HTTP 调用，就不要重新做整套分析
+- 如果目标站点存在明显反自动化机制，则优先直接运行已沉淀好的 Playwright 页面脚本
+- 如果某些凭证失效，再回到 `Playwright MCP Bridge` 页面上下文里更新 `credentials.json`
+
+复用时还要遵守：
+
+- 只有做过一次真实测试并测试成功的脚本，才算沉淀完成
+- 脚本名要明确绑定站点和动作，例如 `http-jike-post-manage.js`
+- 如果本地已有同名脚本，应先比较差异，再决定覆盖还是生成新版本
+- 默认允许分享 `scripts/<connector-id>.js` 和脱敏后的总 `SKILL.md`
+- 不允许分享 cookie、token、session id、refresh token、动态 header 实值，或可直接复用的完整敏感请求样本
+
+这一阶段不要重新打开“分析模式”。
+
+只要已有脚本还能跑，默认直接复用；只有脚本失效、凭证过期或网站行为明显变化时，才回到前面的分析步骤。
+
+### 11. 模式判断：判断最终产物类型
+
+对每个 connector，最终只分两类产物：
+
+1. `HTTP`
+- 产物是 `scripts/http-<connector-id>.js`
 - 只需本地私有凭据即可执行
+- 说明接口已经可以稳定重放，不必依赖页面上下文完成最终动作
 
-2. `browser_context`
-- 必须在浏览器页面上下文内取动态值
+2. `Playwright`
+- 产物是 `scripts/playwright-<connector-id>.js`
+- 最终仍需在真实浏览器页面上下文里执行
+- 默认指 `Playwright MCP + Playwright MCP Bridge` 页面脚本
+- 运行前提是 Agent 已接管真实页面，而不是重新走一套独立 CDP 启动流程
+- 适用于关键动作依赖页面运行时、动态签名、设备证明或其他无法稳定抽离成纯 HTTP 重放的场景
 
-3. `hybrid`
-- 浏览器里取动态值，本地再发请求
+补充说明：
 
-4. `unsupported`
-- 当前无法稳定自动化
+- 默认优先把结果收敛成 `HTTP`，不要因为页面自动化更直接，就过早放弃 HTTP 路线
+- 只有在多次尝试后仍无法稳定得到 HTTP 方案，才允许把最终产物定为 `Playwright`
+- `unsupported` 不再算一种产物类型，而是分析结论：当前无法稳定自动化
+- 分析过程中即使出现“先在浏览器里取动态值，再本地发请求”的过渡形态，最终也应尽量收敛为 `HTTP` 或 `Playwright`
+- 如果补齐动态字段、依赖接口和私有凭证后仍无法稳定自动化，则明确给出 `unsupported` 结论，不产出可复用脚本
+- 若识别到明显反自动化机制，应明确提示“可能无法稳定自动执行”，不要把分析结果包装成已可用脚本
+- `Playwright` 页面脚本一般不需要 `credentials.json`
+  - 因为默认依赖的是已登录页面本身，而不是本地 cookie / token / csrf
+  - 只有当页面脚本确实还依赖额外私有材料时，才把这些私有值写入 `credentials.json`
+  - `page_match`、`base_url`、`selectors`、`timeout` 这类普通运行时配置不算凭证，不应写入 `credentials.json`
 
-## 分享规则
+### 12. 凭证更新：token 过期后更新 `credentials.json`
 
-允许分享：
-- `connector-<site>-<action>/SKILL.md`
-- 脱敏后的 Skill
+很多脚本的真实执行能力，本质上依赖本地 `credentials.json`。
 
-不允许分享：
-- cookie
-- token
-- session id
-- refresh token
-- 动态 header 实值
-- 可直接复用的完整请求样本
+出现以下任一信号，就应该优先怀疑本地凭证已经过期：
 
-## 安装规则
+- 接口返回“未登录”“未授权”“token expired”“session invalid”
+- 原来可用的请求突然全部返回 `401`、`403` 或登录页
+- 同一个脚本之前可用，现在在没有改接口的情况下失效
+- 页面里仍然能正常操作，但本地 direct HTTP 调用失败
 
-当且仅当执行型 Connector 经过一次真实自动化测试且测试成功，才允许安装到用户本地 Agent Skill 目录。
+默认不要手工猜测 token 来源，也不要让用户自己去 DevTools 里一个个复制。
 
-安装时应遵守：
-- Skill 名应明确绑定站点和动作，例如：
-  - `connector-jike-post-create`
-  - `connector-twitter-send-post`
-- Skill 中不能包含真实 cookie、token、session 值
-- 私有材料只能继续保存在本地 `connector.credentials.json` 中，由 Skill 运行时读取
-- 如果用户本地已有同名 Skill，应先比较差异，再决定覆盖或生成新版本
+推荐更新步骤：
 
-## 对 Codex 的行为要求
+1. 让用户先在真实浏览器里重新登录目标站点
+2. 使用 `Playwright MCP Bridge` 接管当前已登录 tab
+3. 重新执行一次最小必要动作
+4. 同时重新读取网络请求和页面运行时里的最新私有值
+5. 只更新对应 connector 所需的字段，不要误覆盖其它 connector
+6. 写回本地 `credentials.json`
+7. 立即用最小真实请求再验证一次
 
-1. 录制前先说明接下来需要用户做什么。
-2. 录制过程中，明确等待用户完成登录和操作。
-3. 不把敏感值直接输出到最终可分享文件。
-4. 如果已经能用规则分析完成，不要强制调用模型。
-5. 如果生成执行型 Skill，默认假设私有材料只存本地，不上传。
-6. 分析完成后，应主动提出执行一次最小自动化测试，而不是直接宣布完成。
-7. 只有测试通过后，才允许把执行型 Skill 安装到用户本地 Agent Skill 目录。
-8. 如果测试失败，应明确阻止安装，并输出失败原因与下一步补齐建议。
-9. 若目标不是 Web 界面系统，应明确提示这超出当前 Skill 的适用范围。
-10. 若识别到明显反自动化机制，应明确提示“可能无法稳定自动执行”，不要把分析结果包装成已可用 Skill。
+对 `HTTP` connector 额外补充一条强制要求：
+
+- 如果原来的 `HTTP` 脚本已经存在，更新完 `credentials.json` 后，优先直接重新运行这份现成脚本
+- 不要用单次 `curl` 或临时拼接请求代替脚本验证
+- 只有“更新凭证后脚本重新跑通”，才算本次凭证刷新完成
+
+更新时必须明确写清：
+
+- 哪个 connector 的凭证已更新
+- 更新了哪些字段
+- 这些字段来自哪里
+- 更新后是否已做最小验证
+
+本步完成标志：
+
+- `credentials.json` 已更新
+- 已明确记录本次更新涉及的字段
+- 已完成一次最小验证，或明确停在等待用户确认测试
 
 ## 参考资料：其他方法
 

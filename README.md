@@ -19,6 +19,8 @@ Apizer 就是总结出的一个给AI干这个事情的skill文档。
    - 推荐使用 `Playwright + Playwright MCP Bridge`
    - 先做分析与沉淀
    - 再进入后续调用阶段
+   - 默认优先导出可稳定重放的 `HTTP` 接口
+   - 只有在多次尝试后仍然不行，例如遇到防自动化机制、动态签名、页面上下文强绑定等情况，才退到操作页面的 `Playwright` 脚本
    - 需要哪些本地材料和输出文件
 3. 必要时，你听从AI的指令，做一些配合工作
 
@@ -32,29 +34,52 @@ Apizer 就是总结出的一个给AI干这个事情的skill文档。
 
 这是 Apizer 自己的主 skill，前面说了。
 
-### 2. 已经分析出来的示例skills
+### 2. 脚本目录
 
-- [skills](./skills)
+- [scripts](./scripts)
 
-当前 `skills/` 目录里已经有这些可直接复用的接口示例：
+这个目录下放的是已经分析完成、后续可直接执行的脚本。
 
-- [connector-deepseek-open-platform-balance](./skills/connector-deepseek-open-platform-balance/SKILL.md)：读取 DeepSeek 开放平台账户余额、赠送余额、可用 token 估算、当月费用、当月 token 用量
-- [connector-jike-post-manage](./skills/connector-jike-post-manage/SKILL.md)：获取即刻帖子列表和互动数、读取单条帖子详情、发帖、删帖
-- [connector-jike-post-engagement-stats](./skills/connector-jike-post-engagement-stats/SKILL.md)：读取即刻帖子列表、正文、发布时间以及点赞、评论、转发、分享统计
-- [connector-wechat-web-message-manage](./skills/connector-wechat-web-message-manage/SKILL.md)：拉取 Web 微信通讯录、获取最新消息、发送文本消息
+Apizer 的默认目标不是一上来就沉淀页面操纵脚本，而是：
 
-这些示例的意义不是“只适用于这些网站”，而是给你一个可复用模板：
+- 先尽量把网站动作收敛成可稳定重放的 `HTTP` 脚本
+- 只有在多次尝试后仍然无法稳定导出 HTTP 接口时，才退到 `Playwright` 页面脚本
 
-- 如何描述 connector 的目标动作
-- 如何说明主接口和辅助接口
-- 如何组织动态字段和本地凭证
-- 如何给 Agent 提供后续可重复调用的执行规则
+也就是说：
 
-### 3. 脱敏的示例credential 文件
+- `HTTP` 脚本是默认优先产物
+- `Playwright` 脚本是实在不行时的退路，但依然是可复用产物
 
-- [connector.credentials.json](./connector.credentials.json)
+当前已经提供这些示例：
 
-这个文件保存本地私有材料，例如：
+- [http-deepseek-open-platform-balance.js](./scripts/http-deepseek-open-platform-balance.js)：读取 DeepSeek 开放平台账户余额、赠送余额、可用 token 估算、当月费用、当月 token 用量
+- [http-jike-post-manage.js](./scripts/http-jike-post-manage.js)：获取即刻帖子列表和互动数、读取单条帖子详情、发帖、删帖
+- [http-jike-post-engagement-stats.js](./scripts/http-jike-post-engagement-stats.js)：读取即刻帖子列表、正文、发布时间以及点赞、评论、转发、分享统计
+- [http-wechat-web-message-manage.js](./scripts/http-wechat-web-message-manage.js)：拉取 Web 微信通讯录、获取最新消息、发送文本消息
+- [playwright-x-post-create.js](./scripts/playwright-x-post-create.js)：基于 `Playwright MCP + Bridge` 在真实已登录的 X 页面发帖，不依赖 `credentials.json`
+
+推荐写法是：
+
+- 一个脚本对应一个站点动作
+- 能稳定重放的接口统一命名为 `http-<connector-id>.js`
+- 必须退回到页面自动化时，再命名为 `playwright-<connector-id>.js`
+- 脚本文件头注释里写清 `connector id`
+- 写清主接口、所需 credentials 字段、输入参数和成功判定
+
+这样后续不需要再读额外的接口文档，直接执行脚本就行。
+
+补充说明：
+
+- `HTTP` 脚本通常可以直接在本地 Node 环境执行
+- `Playwright` 脚本如果明确依赖 `Playwright MCP + Bridge`，则应理解为“给 Agent/runtime 复用的页面动作脚本”
+- 这种脚本的前提是：Agent 已经接管了真实浏览器页面；脚本本身不必再自行启动浏览器
+- 如果脚本只是操作已登录页面，而不需要 cookie/token/session，这类页面选择器和默认 URL 不应写入 `credentials.json`
+
+### 3. 凭证模板与本地敏感文件
+
+- [credentials-example.json](./credentials-example.json)
+
+模板文件里只放占位符。用户本地真实敏感值应保存到项目根目录的 `credentials.json`，例如：
 
 - cookie
 - token
@@ -64,16 +89,19 @@ Apizer 就是总结出的一个给AI干这个事情的skill文档。
 
 作用：
 
-- 给已经沉淀好的 connector skill 提供本地私有凭证
+- 给已经沉淀好的执行脚本提供本地私有凭证
 
 注意：
 
-- 这个文件通常应该只在本地使用
-- 如果要公开分享，应该改成占位符模板，不能直接提交真实值
+- Public 仓库里只提交 `credentials-example.json`
+- 用户本地真实 `credentials.json` 不应上传
+- 推荐先复制模板：
+  - `cp credentials-example.json credentials.json`
+  - 再把占位符替换成自己的真实值
 
 ### 4. `reliable.js` / CDP 录制脚本
 
-- [cdp_record_reliable.js](./scripts/cdp_record_reliable.js)
+- [cdp-record-reliable.js](./scripts/cdp-record-reliable.js)
 
 这是一个 CDP 网络录制脚本。
 
@@ -86,6 +114,17 @@ Apizer 就是总结出的一个给AI干这个事情的skill文档。
 
 - 有些场景下需要单独做 CDP 录制
 - 它可以作为 `Playwright MCP Bridge` 主线之外的补充工具
+
+如果某个 connector 后续需要经常验证，也可以在 `scripts/` 目录里补一个最小验证脚本。
+
+推荐关系是：
+
+- 总 [SKILL.md](./SKILL.md) 里放通用方法
+- `credentials-example.json` 里放公开可提交的占位符模板
+- 用户本地真实私有凭证放 `credentials.json`
+- `scripts/` 里放随时可执行的最小验证脚本
+
+这样后续只要执行脚本，就可以快速验证当前 connector 是否还能正常工作
 
 ## 作者
 
