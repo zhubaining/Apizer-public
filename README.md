@@ -16,11 +16,11 @@ Apizer 就是总结出的一个给AI干这个事情的skill文档。
 
 1. 把 [SKILL.md](./SKILL.md) 直接交给你自己的 Agent，告诉它参照skill分析出某某网站的xx操作的API。
 2. Agent 读取 skill 后，就会知道：
-   - 推荐使用 `Playwright + Playwright MCP Bridge`
+   - 准备 `Playwright + Playwright MCP Bridge`
    - 先做分析与沉淀
    - 再进入后续调用阶段
    - 默认优先导出可稳定重放的 `HTTP` 接口
-   - 只有在多次尝试后仍然不行，例如遇到防自动化机制、动态签名、页面上下文强绑定等情况，才退到操作页面的 `Playwright` 脚本
+   - 如果遇到防自动化机制、动态签名、页面上下文强绑定等情况，HTTP接口无法重放，则产出 `Playwright` 页面操作脚本
    - 需要哪些本地材料和输出文件
 3. 必要时，你听从AI的指令，做一些配合工作
 
