@@ -40,15 +40,10 @@ Apizer 就是总结出的一个给AI干这个事情的skill文档。
 
 这个目录下放的是已经分析完成、后续可直接执行的脚本。
 
-Apizer 的默认目标不是一上来就沉淀页面操纵脚本，而是：
+这里主要沉淀两种脚本：
 
-- 先尽量把网站动作收敛成可稳定重放的 `HTTP` 脚本
-- 只有在多次尝试后仍然无法稳定导出 HTTP 接口时，才退到 `Playwright` 页面脚本
-
-也就是说：
-
-- `HTTP` 脚本是默认优先产物
-- `Playwright` 脚本是实在不行时的退路，但依然是可复用产物
+- `http-*.js`：接口脚本，适合已经能稳定重放的 HTTP 能力
+- `playwright-*.js`：页面操作脚本，适合必须依赖真实页面上下文的能力
 
 当前已经提供这些示例：
 
@@ -57,14 +52,6 @@ Apizer 的默认目标不是一上来就沉淀页面操纵脚本，而是：
 - [http-jike-post-engagement-stats.js](./scripts/http-jike-post-engagement-stats.js)：读取即刻帖子列表、正文、发布时间以及点赞、评论、转发、分享统计
 - [http-wechat-web-message-manage.js](./scripts/http-wechat-web-message-manage.js)：拉取 Web 微信通讯录、获取最新消息、发送文本消息
 - [playwright-x-post-create.js](./scripts/playwright-x-post-create.js)：基于 `Playwright MCP + Bridge` 在真实已登录的 X 页面发帖，不依赖 `credentials.json`，支持直接命令行执行
-
-推荐写法是：
-
-- 一个脚本对应一个站点动作
-- 能稳定重放的接口统一命名为 `http-<connector-id>.js`
-- 必须退回到页面自动化时，再命名为 `playwright-<connector-id>.js`
-- 脚本文件头注释里写清 `connector id`
-- 写清主接口、所需 credentials 字段、输入参数和成功判定
 
 这样后续不需要再读额外的接口文档，直接执行脚本就行。
 
