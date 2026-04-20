@@ -1,0 +1,11 @@
+{
+  "name": "apizer-public",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "check:public-scripts": "node tools/check-public-scripts.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.22.0"
+  }
+}
